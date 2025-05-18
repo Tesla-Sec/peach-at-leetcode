@@ -1,0 +1,7 @@
+PyQt5
+keyboard
+mss
+python-dotenv
+openai
+flask
+pillow
