@@ -1,0 +1,21 @@
+{
+    "opacity": 1.0,
+    "position": "bottom-left",
+    "model": "gpt-4o-2024-05-13",
+    "port": 43000,
+    "margin": [
+        0,
+        0,
+        0,
+        0
+    ],
+    "overlay_width": 420,
+    "overlay_v_offset": 25,
+    "overlay_h_offset": 25,
+    "max_chat_history_pairs": 10,
+    "vision_detail_level": "low",
+    "api_max_tokens": 300,
+    "overlay_height_ratio": 0.9,
+    "whisper_model": "gpt-4o-transcribe",
+    "chat_model": "gpt-4o-2024-05-13"
+}
