@@ -109,8 +109,9 @@ Contributions are very welcome!
 ---
 ## No Donate for Now :)
 
-yep, i make this and the code with AI.
+ yep, i make this and the code with AI.
+
 ---
 ## 📄 License
 
-This project is licensed under the **APACHE License**. See [LICENSE](LICENSE) for details.
+This project is licensed under the **Apache 2.0 License**. See [LICENSE](LICENSE) for details.
