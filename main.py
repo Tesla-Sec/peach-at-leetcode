@@ -147,8 +147,17 @@ class Overlay(QtWidgets.QWidget):
         super().__init__(None, QtCore.Qt.WindowStaysOnTopHint | 
                                QtCore.Qt.FramelessWindowHint | 
                                QtCore.Qt.Tool)
+        
         self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
-        self.setAttribute(QtCore.Qt.WA_ShowWithoutActivating)
+        self.setAttribute(QtCore.Qt.WA_ShowWithoutActivating) # Não rouba foco
+
+        # >>> ADIÇÃO 1: Atributo Qt para transparência de mouse <<<
+        # self.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, True)
+        # Nota: WA_TransparentForMouseEvents pode ser suficiente em alguns casos, mas WS_EX_TRANSPARENT é mais forte.
+        # Se você definir WS_EX_TRANSPARENT (abaixo), WA_TransparentForMouseEvents pode se tornar redundante ou até conflitante.
+        # Teste com e sem esta linha se WS_EX_TRANSPARENT por si só não for ideal (embora geralmente seja).
+
+        # ... (resto do seu __init__ para text_label, etc.)
         self.current_config = dict(initial_config_dict) 
         self.screen_geom = QtWidgets.QApplication.primaryScreen().geometry()
         self.text_label = QtWidgets.QLabel(self)
@@ -158,10 +167,102 @@ class Overlay(QtWidgets.QWidget):
         )
         self.text_label.setAlignment(QtCore.Qt.AlignTop | QtCore.Qt.AlignLeft)
         self.text_label.setWordWrap(True)
-        self.text_label.setOpenExternalLinks(True)
+        # IMPORTANTE: Se a janela for WS_EX_TRANSPARENT, os links dentro do QLabel não serão clicáveis
+        # porque a janela inteira não processará cliques. Se precisar de links clicáveis, esta
+        # abordagem de "click-through total" não funcionará para os links.
+        self.text_label.setOpenExternalLinks(False) # Desabilitar se for tornar a janela totalmente transparente para cliques
+
         self.apply_geometry_from_config(self.current_config)
         self.show()
-        QtCore.QTimer.singleShot(200, self.exclude_from_capture)
+        
+        # É crucial aplicar o WS_EX_TRANSPARENT DEPOIS que a janela é mostrada e tem um HWND válido.
+        QtCore.QTimer.singleShot(50, self.make_window_click_through) # Um pequeno delay para garantir HWND
+
+    def make_window_click_through(self):
+        """Aplica o estilo WS_EX_TRANSPARENT para tornar a janela não clicável."""
+        try:
+            hwnd = self.winId().__int__() # ou int(self.winId())
+            if not hwnd:
+                print("Overlay HWND não disponível para make_window_click_through.")
+                # Tentar novamente se o HWND ainda não estiver pronto
+                QtCore.QTimer.singleShot(100, self.make_window_click_through)
+                return
+
+            # Constantes WinAPI para estilos estendidos
+            GWL_EXSTYLE = -20
+            WS_EX_LAYERED = 0x00080000  # Necessário para SetLayeredWindowAttributes se você for usar
+            WS_EX_TRANSPARENT = 0x00000020 # Chave para o "click-through"
+
+            # Obter o estilo estendido atual
+            current_ex_style = user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
+            
+            # Adicionar WS_EX_TRANSPARENT
+            # Nota: Se você já usa WA_TranslucentBackground com Qt, a janela já é "layered" de certa forma.
+            # Adicionar WS_EX_LAYERED explicitamente pode não ser necessário, ou pode já estar implícito.
+            # WS_EX_TRANSPARENT é a flag principal aqui.
+            new_ex_style = current_ex_style | WS_EX_TRANSPARENT
+            
+            if not user32.SetWindowLongW(hwnd, GWL_EXSTYLE, new_ex_style):
+                print(f"Falha ao definir SetWindowLongW com WS_EX_TRANSPARENT. Erro: {ctypes.get_last_error()}")
+            else:
+                print(f"Overlay (HWND: {hwnd}): Estilo WS_EX_TRANSPARENT aplicado para click-through.")
+            
+            # Opcional: Se você também quiser transparência alfa para a janela inteira (não apenas o fundo)
+            # e o WA_TranslucentBackground não estiver fazendo o efeito desejado junto com WS_EX_TRANSPARENT.
+            # Geralmente, WA_TranslucentBackground + WS_EX_TRANSPARENT funciona bem.
+            # Se for definir transparência alfa com SetLayeredWindowAttributes, a janela PRECISA ter WS_EX_LAYERED.
+            # E a opacidade definida pelo Qt (setWindowOpacity) pode interagir de forma complexa.
+            #
+            # user32.SetWindowLongW(hwnd, GWL_EXSTYLE, current_ex_style | WS_EX_LAYERED | WS_EX_TRANSPARENT)
+            # opacity_level_winapi = int(self.windowOpacity() * 255) # Converter opacidade Qt para escala WinAPI (0-255)
+            # user32.SetLayeredWindowAttributes(hwnd, 0, opacity_level_winapi, 0x00000002) # LWA_ALPHA
+            # Se fizer isso, a opacidade do Qt pode não funcionar mais como esperado.
+
+        except Exception as e:
+            print(f"Erro crítico ao tornar a janela click-through: {e}\n{traceback.format_exc()}")
+
+
+    def exclude_from_capture(self):
+        """Configura a afinidade de exibição e outros estilos para 'stealth'."""
+        try:
+            hwnd = self.winId().__int__()
+            if not hwnd: 
+                print("Overlay HWND não disponível para exclude_from_capture.")
+                # Poderia tentar novamente, mas make_window_click_through já tem um retry
+                return
+
+            # Configuração para não ser capturado (Display Affinity)
+            if hasattr(user32, 'SetWindowDisplayAffinity'):
+                WDA_EXCLUDEFROMCAPTURE = 0x00000011
+                WDA_MONITOR = 0x00000001
+                if not user32.SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE):
+                    ctypes.set_last_error(0) # Limpa o erro
+                    if not user32.SetWindowDisplayAffinity(hwnd, WDA_MONITOR):
+                         print(f"Falha ao definir DisplayAffinity para MONITOR. Erro: {ctypes.get_last_error()}")
+                    else:
+                        print(f"Overlay (HWND: {hwnd}): DisplayAffinity = MONITOR.")
+                else:
+                    print(f"Overlay (HWND: {hwnd}): DisplayAffinity = EXCLUDEFROMCAPTURE.")
+            else:
+                print("SetWindowDisplayAffinity não encontrado.")
+
+            # Estilos adicionais para 'stealth' e comportamento da janela
+            # (WS_EX_TRANSPARENT será aplicado por make_window_click_through)
+            GWL_EXSTYLE = -20
+            WS_EX_TOOLWINDOW = 0x00000080  # Não aparece na barra de tarefas nem no Alt+Tab
+            WS_EX_NOACTIVATE = 0x08000000  # Janela não se torna ativa (não recebe foco do teclado)
+            
+            current_ex_style = user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
+            # Aplicar estilos exceto WS_EX_TRANSPARENT aqui, pois será feito em make_window_click_through
+            new_ex_style_base = current_ex_style | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW
+            
+            if not user32.SetWindowLongW(hwnd, GWL_EXSTYLE, new_ex_style_base):
+                print(f"Falha ao definir SetWindowLongW (base). Erro: {ctypes.get_last_error()}")
+            else:
+                print(f"Overlay (HWND: {hwnd}): Estilos WS_EX_NOACTIVATE e WS_EX_TOOLWINDOW aplicados.")
+
+        except Exception as e:
+            print(f"Erro crítico ao configurar estilos de janela/afinidade: {e}\n{traceback.format_exc()}")
 
     def apply_geometry_from_config(self, config_dict):
         self.current_config = dict(config_dict) 
