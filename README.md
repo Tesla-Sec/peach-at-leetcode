@@ -113,4 +113,4 @@ yep, i make this and the code with AI.
 ---
 ## 📄 License
 
-This project is licensed under the **MIT License**. See [LICENSE](LICENSE) for details.
+This project is licensed under the **APACHE License**. See [LICENSE](LICENSE) for details.
