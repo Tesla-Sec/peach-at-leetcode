@@ -5,3 +5,6 @@ python-dotenv
 openai
 flask
 pillow
+threading
+pyaudio
+wave
