@@ -173,6 +173,7 @@ class Overlay(QtWidgets.QWidget):
         self.text_label.setOpenExternalLinks(False) # Desabilitar se for tornar a janela totalmente transparente para cliques
 
         self.apply_geometry_from_config(self.current_config)
+        self.exclude_from_capture()
         self.show()
         
         # É crucial aplicar o WS_EX_TRANSPARENT DEPOIS que a janela é mostrada e tem um HWND válido.
@@ -289,7 +290,7 @@ class Overlay(QtWidgets.QWidget):
         self.setGeometry(int(pos_x), int(pos_y), int(overlay_width), int(overlay_height))
         if hasattr(self, 'text_label'):
              self.text_label.setGeometry(0, 0, int(overlay_width), int(overlay_height))
-
+    '''
     def exclude_from_capture(self):
         try:
             hwnd = self.winId().__int__()
@@ -307,7 +308,7 @@ class Overlay(QtWidgets.QWidget):
             user32.SetWindowLongW(hwnd, GWL_EXSTYLE, new_ex_style)
         except Exception as e:
             print(f"Erro ao configurar estilos de janela/afinidade: {e}\n{traceback.format_exc()}")
-
+    '''
     @QtCore.pyqtSlot(str)
     def update_text_display(self, content_html_str):
         try:
