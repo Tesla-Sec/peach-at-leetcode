@@ -1,6 +1,7 @@
 import sys
 import io 
 import base64
+from colorama import init, Fore, Style
 import threading
 from dotenv import load_dotenv
 import os
@@ -14,6 +15,9 @@ import json
 import html
 import traceback
 
+# Preparação do ambiente para cores
+init(autoreset=True)
+
 # Adições para áudio
 try:
     import pyaudio
@@ -21,7 +25,7 @@ try:
     PYAUDIO_AVAILABLE = True
 except ImportError:
     PYAUDIO_AVAILABLE = False
-    print("AVISO: PyAudio não encontrado. Funcionalidade de gravação de áudio desabilitada.")
+    print(Fore.YELLOW + "AVISO: PyAudio não encontrado. Funcionalidade de gravação de áudio desabilitada.")
 
 # 1) Carrega .env e Configurações
 load_dotenv()
@@ -195,7 +199,7 @@ class Overlay(QtWidgets.QWidget):
                 # print(f"Overlay (HWND: {hwnd}): Estilo WS_EX_TRANSPARENT aplicado para click-through.") # Comentado
                 pass
         except Exception as e:
-            print(f"Erro crítico ao tornar a janela click-through: {e}\n{traceback.format_exc()}")
+            print(Fore.RED + f"Erro crítico ao tornar a janela click-through: {e}\n{traceback.format_exc()}")
 
     def exclude_from_capture(self):
         try:
@@ -233,7 +237,7 @@ class Overlay(QtWidgets.QWidget):
                 # print(f"Overlay (HWND: {hwnd}): Estilos WS_EX_NOACTIVATE e WS_EX_TOOLWINDOW aplicados.")
 
         except Exception as e:
-            print(f"Erro crítico ao configurar estilos de janela/afinidade: {e}\n{traceback.format_exc()}")
+            print(Fore.RED + f"Erro crítico ao configurar estilos de janela/afinidade: {e}\n{traceback.format_exc()}")
 
     def apply_geometry_from_config(self, config_dict):
         self.current_config = dict(config_dict) 
@@ -312,9 +316,9 @@ class AppController(QtCore.QObject):
         try:
             self.openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
             if not os.getenv("OPENAI_API_KEY"): 
-                raise ValueError("Chave OPENAI_API_KEY não encontrada no arquivo .env.")
+                raise ValueError(Fore.YELLOW + "Chave OPENAI_API_KEY não encontrada no arquivo .env.")
         except Exception as e_openai:
-            print(f"ERRO CRÍTICO - Inicialização OpenAI Falhou: {e_openai}")
+            print(Fore.RED + f"ERRO CRÍTICO - Inicialização OpenAI Falhou: {e_openai}")
             self.openai_client = None
             if hasattr(self, 'signal_set_temporary_message'):
                  QtCore.QTimer.singleShot(100, lambda: self.signal_set_temporary_message.emit("<p style='color:red;text-align:center;'>ERRO: OpenAI não configurado. Verifique a API KEY.</p>", 0) if self.openai_client is None else None)
@@ -356,12 +360,12 @@ class AppController(QtCore.QObject):
             try:
                 self.pyaudio_instance = pyaudio.PyAudio()
             except Exception as e:
-                print(f"Erro ao inicializar PyAudio globalmente: {e}")
+                print(Fore.RED + f"Erro ao inicializar PyAudio globalmente: {e}")
                 self.pyaudio_instance = None
                 # Modifica a global PYAUDIO_AVAILABLE. Como 'global PYAUDIO_AVAILABLE' foi declarado no início do método,
                 # esta atribuição refere-se à variável global.
                 PYAUDIO_AVAILABLE = False 
-                print("Aviso: PYAUDIO_AVAILABLE foi definido como False devido a um erro de inicialização.")
+                print(Fore.YELLOW + "Aviso: PYAUDIO_AVAILABLE foi definido como False devido a um erro de inicialização.")
                 if hasattr(self, 'signal_set_temporary_message'):
                      QtCore.QTimer.singleShot(100, lambda: self.signal_set_temporary_message.emit(f"<p style='color:red;text-align:center;'>Erro PyAudio: {e}. Gravação desabilitada.</p>", 5000))
 
@@ -421,7 +425,7 @@ class AppController(QtCore.QObject):
                     with open(CONFIG_FILE, 'w') as f: json.dump(default_cfg, f, indent=4)
                     return default_cfg
             except Exception as e:
-                print(f"ERRO ao carregar/criar '{CONFIG_FILE}': {e}. Usando defaults.\n{traceback.format_exc()}")
+                print(Fore.RED + f"ERRO ao carregar/criar '{CONFIG_FILE}': {e}. Usando defaults.\n{traceback.format_exc()}")
                 return default_cfg
     
     def save_config(self, config_to_save=None):
@@ -431,7 +435,7 @@ class AppController(QtCore.QObject):
                 cfg_data = config_to_save if config_to_save else self.config
                 with open(CONFIG_FILE, 'w') as f: json.dump(cfg_data, f, indent=4)
         except Exception as e: 
-            print(f"ERRO ao salvar configurações: {e}\n{traceback.format_exc()}")
+            print(Fore.RED + f"ERRO ao salvar configurações: {e}\n{traceback.format_exc()}")
     
     @QtCore.pyqtSlot(bool)
     def _set_processing_flag_slot(self, state: bool):
@@ -484,7 +488,7 @@ class AppController(QtCore.QObject):
                 if monitor_idx_mss >= len(sct.monitors): 
                     monitor_idx_mss = 0 if len(sct.monitors) > 0 else 1 
                     if monitor_idx_mss == 0 and len(sct.monitors) == 0 : 
-                        raise Exception("Nenhum monitor detectado pelo MSS.")
+                        raise Exception(Fore.YELLOW + "Nenhum monitor detectado pelo MSS.")
 
                 base_monitor_details = sct.monitors[monitor_idx_mss]
                 capture_details = dict(base_monitor_details) 
@@ -507,7 +511,7 @@ class AppController(QtCore.QObject):
                 sct_img_obj = sct.grab(capture_details)
                 return mss.tools.to_png(sct_img_obj.rgb, sct_img_obj.size)
         except Exception as e:
-            print(f"ERRO MSS Captura de Tela: {e}\n{traceback.format_exc()}")
+            print(Fore.RED + f"ERRO MSS Captura de Tela: {e}\n{traceback.format_exc()}")
             self.signal_set_temporary_message.emit(f"<p style='color:red;text-align:center;'>Erro ao capturar tela: {html.escape(str(e))[:50]}</p>", 4000)
             return None
 
@@ -551,7 +555,7 @@ class AppController(QtCore.QObject):
         except Exception as e:
             err_msg = f"<p style='color:#FF7043; text-align:center;'>Erro API Visão: {html.escape(str(e))[:100]}</p>"
             self.signal_update_overlay_content.emit(err_msg)
-            print(f"ERRO API OpenAI (Visão): {e}\n{traceback.format_exc()}")
+            print(Fore.RED + f"ERRO API OpenAI (Visão): {e}\n{traceback.format_exc()}")
         finally: 
             self.signal_toggle_processing_flag.emit(False)
 
@@ -619,7 +623,7 @@ class AppController(QtCore.QObject):
                 self.mic_audio_recorder_thread.start()
         except Exception as e:
             self.is_recording_mic_audio = False 
-            print(f"ERRO ESC+4: {e}\n{traceback.format_exc()}")
+            print(Fore.RED + f"ERRO ESC+4: {e}\n{traceback.format_exc()}")
             self.signal_set_temporary_message.emit(f"<p style='color:red;text-align:center;'>Erro na gravação de microfone: {html.escape(str(e))[:50]}</p>", 3000)
 
     def _threaded_record_mic_audio(self):
@@ -640,7 +644,7 @@ class AppController(QtCore.QObject):
                 if not captured_screenshot_bytes:
                      self.signal_set_temporary_message.emit("<p style='color:orange;text-align:center;'>Falha ao capturar tela. Tentando enviar apenas áudio do microfone.</p>", 3500)
         except Exception as e:
-            print(f"ERRO PyAudio na gravação de microfone: {e}\n{traceback.format_exc()}"); self.is_recording_mic_audio = False
+            print(Fore.RED + f"ERRO PyAudio na gravação de microfone: {e}\n{traceback.format_exc()}"); self.is_recording_mic_audio = False
             self.signal_set_temporary_message.emit(f"<p style='color:red;text-align:center;'>Erro PyAudio (Mic): {html.escape(str(e))[:50]}</p>", 4000); return
         finally:
             if audio_stream: audio_stream.stop_stream(); audio_stream.close()
@@ -674,7 +678,7 @@ class AppController(QtCore.QObject):
                     wf.writeframes(b''.join(frames_copy))
                 audio_file_path_to_process = TEMP_AUDIO_FILENAME
             except Exception as e:
-                print(f"ERRO ao salvar WAV (mic) para processamento multimodal: {e}\n{traceback.format_exc()}")
+                print(Fore.RED + f"ERRO ao salvar WAV (mic) para processamento multimodal: {e}\n{traceback.format_exc()}")
                 self.signal_set_temporary_message.emit(f"<p style='color:red;text-align:center;'>Erro ao salvar áudio WAV (mic): {html.escape(str(e))[:50]}</p>", 3000)
         
         self._threaded_transcribe_audio_and_call_multimodal_vision(audio_file_path_to_process, image_bytes_param, "mic")
@@ -692,7 +696,7 @@ class AppController(QtCore.QObject):
                     if device_info['hostApi'] == default_host_api_info['index'] and \
                        device_info['maxInputChannels'] > 0 and \
                        device_info.get('isLoopbackDevice'): 
-                        print(f"Dispositivo loopback WASAPI (flag) encontrado: {device_info['name']} - Índice: {device_info['index']}")
+                        print(Fore.YELLOW + f"Dispositivo loopback WASAPI (flag) encontrado: {device_info['name']} - Índice: {device_info['index']}")
                         return device_info['index']
                 
                 common_loopback_names = ["stereo mix", "mixagem estéreo", "wave out", "what u hear", "o que você ouve", "loopback", "monitor"]
@@ -700,15 +704,15 @@ class AppController(QtCore.QObject):
                     device_info = self.pyaudio_instance.get_device_info_by_index(i)
                     if device_info['hostApi'] == default_host_api_info['index'] and device_info['maxInputChannels'] > 0:
                         if any(name_part in device_info['name'].lower() for name_part in common_loopback_names):
-                            print(f"Dispositivo loopback WASAPI (nome) encontrado: {device_info['name']} - Índice: {device_info['index']}")
+                            print(Fore.GREEN + f"Dispositivo loopback WASAPI (nome) encontrado: {device_info['name']} - Índice: {device_info['index']}")
                             return device_info['index']
             
             self.signal_set_temporary_message.emit("<p style='color:orange;text-align:center;'>Loopback WASAPI não encontrado. Verifique 'Stereo Mix' nas configs de som do Windows.</p>", 5000)
-            print("AVISO: Nenhum dispositivo de loopback WASAPI encontrado explicitamente. Verifique se 'Stereo Mix' ou similar está habilitado e tente novamente.")
+            print(Fore.YELLOW + "AVISO: Nenhum dispositivo de loopback WASAPI encontrado explicitamente. Verifique se 'Stereo Mix' ou similar está habilitado e tente novamente.")
             return None
 
         except Exception as e:
-            print(f"Erro ao procurar dispositivo de loopback: {e}")
+            print(Fore.RED + f"Erro ao procurar dispositivo de loopback: {e}")
             self.signal_set_temporary_message.emit(f"<p style='color:red;text-align:center;'>Erro ao procurar loopback: {html.escape(str(e))[:30]}</p>", 4000)
             return None
 
@@ -744,7 +748,7 @@ class AppController(QtCore.QObject):
                 self.system_audio_recorder_thread.start()
         except Exception as e:
             self.is_recording_system_audio = False
-            print(f"ERRO ESC+5: {e}\n{traceback.format_exc()}")
+            print(Fore.RED + f"ERRO ESC+5: {e}\n{traceback.format_exc()}")
             self.signal_set_temporary_message.emit(f"<p style='color:red;text-align:center;'>Erro gravação Som Sistema: {html.escape(str(e))[:50]}</p>", 3000)
 
 
@@ -762,9 +766,9 @@ class AppController(QtCore.QObject):
                 device_info = self.pyaudio_instance.get_device_info_by_index(device_index)
                 actual_rate = int(device_info.get('defaultSampleRate', AUDIO_RATE))
                 actual_channels = int(device_info.get('maxInputChannels', AUDIO_CHANNELS_SYSTEM)) 
-                print(f"Gravando do dispositivo '{device_info['name']}' com {actual_channels} canais a {actual_rate} Hz.")
+                print(Fore.CYAN + f"Gravando do dispositivo '{device_info['name']}' com {actual_channels} canais a {actual_rate} Hz.")
             except Exception as e_dev_info:
-                print(f"Aviso: Não foi possível obter detalhes do dispositivo de loopback, usando defaults. Erro: {e_dev_info}")
+                print(Fore.YELLOW + f"Aviso: Não foi possível obter detalhes do dispositivo de loopback, usando defaults. Erro: {e_dev_info}")
 
             audio_stream_system = self.pyaudio_instance.open(format=AUDIO_FORMAT,
                                                              channels=actual_channels,
@@ -784,7 +788,7 @@ class AppController(QtCore.QObject):
                     self.signal_set_temporary_message.emit("<p style='color:orange;text-align:center;'>Falha ao capturar tela. Tentando enviar apenas som do sistema.</p>", 3500)
         
         except Exception as e:
-            print(f"ERRO PyAudio na gravação de som do sistema: {e}\n{traceback.format_exc()}")
+            print(Fore.RED + f"ERRO PyAudio na gravação de som do sistema: {e}\n{traceback.format_exc()}")
             self.is_recording_system_audio = False
             self.signal_set_temporary_message.emit(f"<p style='color:red;text-align:center;'>Erro PyAudio (Sistema): {html.escape(str(e))[:50]}</p>", 4000)
             return 
@@ -823,7 +827,7 @@ class AppController(QtCore.QObject):
                     wf.writeframes(b''.join(frames_copy))
                 audio_file_path_to_process = TEMP_SYSTEM_AUDIO_FILENAME
             except Exception as e:
-                print(f"ERRO ao salvar WAV (sistema) para processamento multimodal: {e}\n{traceback.format_exc()}")
+                print(Fore.RED + f"ERRO ao salvar WAV (sistema) para processamento multimodal: {e}\n{traceback.format_exc()}")
                 self.signal_set_temporary_message.emit(f"<p style='color:red;text-align:center;'>Erro ao salvar áudio WAV (sistema): {html.escape(str(e))[:50]}</p>", 3000)
 
         self._threaded_transcribe_audio_and_call_multimodal_vision(audio_file_path_to_process, image_bytes_param, "system")
@@ -865,7 +869,7 @@ class AppController(QtCore.QObject):
                     if image_bytes_param:
                          self.signal_set_temporary_message.emit(f"<p style='color:orange;text-align:center;'>{transcription_source_prefix} vazio. Processando imagem com contexto de áudio vazio.</p>", 3500)
             except Exception as e_whisper:
-                print(f"ERRO API OpenAI (Whisper - {audio_source_type}): {e_whisper}\n{traceback.format_exc()}")
+                print(Fore.RED + f"ERRO API OpenAI (Whisper - {audio_source_type}): {e_whisper}\n{traceback.format_exc()}")
                 transcribed_text = f"Erro ao transcrever {transcription_source_prefix.lower()}: {str(e_whisper)[:50]}"
                 if not image_bytes_param: 
                     self.signal_set_temporary_message.emit(f"<p style='color:red;text-align:center;'>Erro Whisper ({audio_source_type}) e sem imagem: {html.escape(str(e_whisper))[:70]}</p>", 4000)
@@ -875,7 +879,7 @@ class AppController(QtCore.QObject):
             finally:
                 if audio_filepath and os.path.exists(audio_filepath):
                     try: os.remove(audio_filepath)
-                    except Exception as e_del: print(f"ERRO ao deletar {audio_filepath}: {e_del}")
+                    except Exception as e_del: print(Fore.RED + f"ERRO ao deletar {audio_filepath}: {e_del}")
         elif not image_bytes_param: 
             self.signal_set_temporary_message.emit("<p style='color:red; text-align:center;'>Sem áudio ou imagem para processar.</p>", 4000)
             self.display_last_chat_message_or_default()
@@ -933,7 +937,7 @@ class AppController(QtCore.QObject):
         except Exception as e_multimodal:
             err_msg = f"<p style='color:#FF7043; text-align:center;'>Erro IA Multimodal ({audio_source_type}): {html.escape(str(e_multimodal))[:80]}</p>"
             self.signal_update_overlay_content.emit(err_msg)
-            print(f"ERRO API OpenAI (Multimodal - {audio_source_type}): {e_multimodal}\n{traceback.format_exc()}")
+            print(Fore.RED + f"ERRO API OpenAI (Multimodal - {audio_source_type}): {e_multimodal}\n{traceback.format_exc()}")
         finally:
             self.signal_toggle_processing_flag.emit(False)
 
@@ -1014,9 +1018,9 @@ class AppController(QtCore.QObject):
                 try:
                     self._current_keyboard_hook = keyboard.hook(self._process_text_input_event, suppress=False) 
                     self._text_input_hook_active = True
-                    print("Gancho de teclado para entrada de texto ATIVADO.")
+                    print(Fore.GREEN + "Gancho de teclado para entrada de texto ATIVADO.")
                 except Exception as e:
-                    print(f"Erro ao registrar gancho de teclado para texto: {e}")
+                    print(Fore.RED + f"Erro ao registrar gancho de teclado para texto: {e}")
                     self.is_text_input_mode = False 
                     AppController._chat_hotkeys_globally_enabled = True
                     self.signal_set_temporary_message.emit("<p style='color:red;'>Erro ao ativar modo de texto.</p>", 3000)
@@ -1030,9 +1034,9 @@ class AppController(QtCore.QObject):
                     keyboard.unhook(self._current_keyboard_hook)
                     self._current_keyboard_hook = None 
                     self._text_input_hook_active = False
-                    print("Gancho de teclado para entrada de texto DESATIVADO.")
+                    print(Fore.YELLOW + "Gancho de teclado para entrada de texto DESATIVADO.")
                 except Exception as e: 
-                    print(f"Erro ao remover gancho de teclado para texto: {e}")
+                    print(Fore.RED + f"Erro ao remover gancho de teclado para texto: {e}")
             self.display_last_chat_message_or_default()
 
 
@@ -1126,7 +1130,7 @@ class AppController(QtCore.QObject):
         except Exception as e:
             error_message = f"Erro na API OpenAI (Chat): {html.escape(str(e))[:100]}"
             self.history.append({"role": "assistant", "content": f"Erro: {error_message}"}) 
-            print(f"ERRO API OpenAI (Chat Texto): {e}\n{traceback.format_exc()}")
+            print(Fore.RED + f"ERRO API OpenAI (Chat Texto): {e}\n{traceback.format_exc()}")
         finally:
             self.signal_toggle_processing_flag.emit(False)
             self._update_text_input_overlay_display() 
@@ -1192,7 +1196,7 @@ class AppController(QtCore.QObject):
                 self.menu_is_active = False; AppController._chat_hotkeys_globally_enabled = True
                 self.display_last_chat_message_or_default()
         except Exception as e: 
-            print(f"ERRO Menu Enter: {e}\n{traceback.format_exc()}")
+            print(Fore.RED + f"ERRO Menu Enter: {e}\n{traceback.format_exc()}")
             self.signal_set_temporary_message.emit("<p style='color:red;text-align:center'>Erro ao processar opção do menu.</p>", 3000)
             
     def display_last_chat_message_or_default(self):
@@ -1233,10 +1237,10 @@ class AppController(QtCore.QObject):
     
     def on_hotkey_esc_1(self): 
         try: self._initiate_chatgpt_request(True)
-        except Exception as e: print(f"ERRO ESC+1: {e}\n{traceback.format_exc()}")
+        except Exception as e: print(Fore.RED + f"ERRO ESC+1: {e}\n{traceback.format_exc()}")
     def on_hotkey_esc_2(self): 
         try: self._initiate_chatgpt_request(False)
-        except Exception as e: print(f"ERRO ESC+2: {e}\n{traceback.format_exc()}")
+        except Exception as e: print(Fore.RED + f"ERRO ESC+2: {e}\n{traceback.format_exc()}")
     
     def on_hotkey_esc_3_menu_toggle(self):
         if self.is_text_input_mode:
@@ -1252,7 +1256,7 @@ class AppController(QtCore.QObject):
                 self.signal_update_menu_display.emit(self.menu_options_list, self.current_menu_selection_idx)
             else: 
                 self.display_last_chat_message_or_default()
-        except Exception as e: print(f"ERRO ESC+3: {e}\n{traceback.format_exc()}")
+        except Exception as e: print(Fore.RED + f"ERRO ESC+3: {e}\n{traceback.format_exc()}")
 
     def on_hotkey_esc_0_exit_menu_or_clear(self):
         try:
@@ -1274,7 +1278,7 @@ class AppController(QtCore.QObject):
                 self.signal_set_temporary_message.emit("<p style='text-align:center;'>Use ESC+4 para parar a gravação do microfone.</p>", 2500)
             elif self.is_recording_system_audio:
                 self.signal_set_temporary_message.emit("<p style='text-align:center;'>Use ESC+5 para parar a gravação do som do sistema.</p>", 2500)
-        except Exception as e: print(f"ERRO ESC+0: {e}\n{traceback.format_exc()}")
+        except Exception as e: print(Fore.RED + f"ERRO ESC+0: {e}\n{traceback.format_exc()}")
 
     def on_hotkey_web_config(self): 
         if self.is_text_input_mode:
@@ -1300,7 +1304,7 @@ class AppController(QtCore.QObject):
                         f"<p style='font-size:small;'>(Retornando em 15s ou ESC+0)</p></div>")
             self.signal_set_temporary_message.emit(msg_html, 15000)
         except Exception as e: 
-            print(f"ERRO CTRL+9 (Web Config): {e}\n{traceback.format_exc()}")
+            print(Fore.RED + f"ERRO CTRL+9 (Web Config): {e}\n{traceback.format_exc()}")
             self.signal_set_temporary_message.emit(f"<p style='color:red;text-align:center;'>Erro ao abrir config web: {html.escape(str(e))[:50]}</p>", 4000)
             
     def on_menu_navigation_input(self, direction_str_up_down):
@@ -1314,10 +1318,10 @@ class AppController(QtCore.QObject):
                     self.current_menu_selection_idx = (self.current_menu_selection_idx + 1) % len(self.menu_options_list)
                 self.signal_update_menu_display.emit(self.menu_options_list, self.current_menu_selection_idx)
         except Exception as e: 
-            print(f"ERRO Navegação Menu ({direction_str_up_down}):{e}\n{traceback.format_exc()}")
+            print(Fore.RED + f"ERRO Navegação Menu ({direction_str_up_down}):{e}\n{traceback.format_exc()}")
     
     def cleanup_on_exit(self):
-        print("Limpando recursos antes de sair...")
+        print(Fore.GREEN + "Limpando recursos antes de sair...")
         self.save_config()
 
         if self._text_input_hook_active and self._current_keyboard_hook is not None:
@@ -1325,27 +1329,27 @@ class AppController(QtCore.QObject):
                 keyboard.unhook(self._current_keyboard_hook) 
                 self._current_keyboard_hook = None
                 self._text_input_hook_active = False
-                print("Gancho de teclado para entrada de texto DESATIVADO na saída.")
+                print(Fore.GREEN + "Gancho de teclado para entrada de texto DESATIVADO na saída.")
             except Exception as e: 
-                print(f"Erro ao remover gancho de texto na saída: {e}")
+                print(Fore.RED + f"Erro ao remover gancho de texto na saída: {e}")
         elif self._text_input_hook_active: 
-             print("Aviso: Gancho de texto estava ativo mas sem handle para remover especificamente.")
+             print(Fore.YELLOW + "Aviso: Gancho de texto estava ativo mas sem handle para remover especificamente.")
 
 
         if self.pyaudio_instance:
             try:
                 self.pyaudio_instance.terminate()
-                print("Instância PyAudio finalizada.")
+                print(Fore.GREEN + "Instância PyAudio finalizada.")
             except Exception as e:
-                print(f"Erro ao finalizar PyAudio: {e}")
+                print(Fore.RED + f"Erro ao finalizar PyAudio: {e}")
         
         for temp_file in [TEMP_AUDIO_FILENAME, TEMP_SYSTEM_AUDIO_FILENAME]:
             if os.path.exists(temp_file):
                 try:
                     os.remove(temp_file)
-                    print(f"Arquivo temporário {temp_file} removido.")
+                    print(Fore.YELLOW + f"Arquivo temporário {temp_file} removido.")
                 except Exception as e_del:
-                    print(f"Erro ao deletar {temp_file}: {e_del}")
+                    print(Fore.RED + f"Erro ao deletar {temp_file}: {e_del}")
 
 # --- Main Application Setup & Execution ---
 def main():
@@ -1383,7 +1387,7 @@ def main():
             try: 
                 keyboard.add_hotkey(key_combo, callback_func, suppress=True, timeout=0.1, trigger_on_release=False)
             except Exception as e_hk: 
-                print(f"Erro ao registrar hotkey {key_combo}: {e_hk}")
+                print(Fore.RED + f"Erro ao registrar hotkey {key_combo}: {e_hk}")
 
         app.aboutToQuit.connect(app_controller_instance.cleanup_on_exit) 
         
@@ -1398,35 +1402,33 @@ def main():
         exit_status_code = app.exec_()
 
     except Exception as e_main:
-        print(f"Erro fatal na aplicação: {e_main}\n{traceback.format_exc()}")
+        print(Fore.RED + f"Erro fatal na aplicação: {e_main}\n{traceback.format_exc()}")
         try: keyboard.unhook_all() 
         except Exception: pass
         sys.exit(1) 
     finally:
-        print("Desregistrando todas as hotkeys e ganchos do teclado...")
+        print(Fore.YELLOW + "Desregistrando todas as hotkeys e ganchos do teclado...")
         try: keyboard.unhook_all() 
-        except Exception as e_final_unhook: print(f"Erro ao desregistrar ganchos na finalização: {e_final_unhook}")
+        except Exception as e_final_unhook: print(Fore.RED + f"Erro ao desregistrar ganchos na finalização: {e_final_unhook}")
         
         for temp_file in [TEMP_AUDIO_FILENAME, TEMP_SYSTEM_AUDIO_FILENAME]:
             if os.path.exists(temp_file):
                 try: os.remove(temp_file)
-                except Exception as e_fdel: print(f"Erro na limpeza final de {temp_file}: {e_fdel}")
-                
+                except Exception as e_fdel: print(Fore.RED + f"Erro na limpeza final de {temp_file}: {e_fdel}")
     sys.exit(exit_status_code)
 
 
 if __name__ == "__main__":
     if not PYAUDIO_AVAILABLE and os.name == 'nt': 
-        print("-" * 70 + "\nAVISO: PyAudio não foi carregado. A funcionalidade de gravação de áudio estará desabilitada.\n"
-              "Para habilitar, tente:\n"
-              "1. Instalar o PyAudio: 'pip install pyaudio'\n"
-              "2. Se a instalação direta falhar, você pode precisar instalar de um arquivo .whl:\n"
-              "   a. Baixe o wheel apropriado para sua versão do Python e arquitetura do Windows\n"
-              "      (procure por 'PyAudio wheels for Windows Python X.Y').\n"
-              "   b. Instale com: 'pip install nome_do_arquivo.whl'\n"
-              "3. Verifique também se o 'Microsoft Visual C++ Build Tools' está instalado.\n"
-              "Para gravação do SOM DO SISTEMA (ESC+5), certifique-se que 'Stereo Mix' (ou 'Mixagem Estéreo')\n"
-              "está HABILITADO nos seus dispositivos de gravação do Windows.\n" + "-" * 70)
+        print("-" * 70 + Fore.YELLOW + "\nAVISO: PyAudio não foi carregado. A funcionalidade de gravação de áudio estará desabilitada.\n"
+              + Fore.WHITE + "Para habilitar, tente:\n"
+              + Fore.CYAN + "1" + Fore.WHITE + ". Instalar o PyAudio: 'pip install pyaudio'\n"
+              + Fore.CYAN + "2" + Fore.WHITE + ". Se a instalação direta falhar, você pode precisar instalar de um arquivo .whl:\n"
+              + Fore.LIGHTBLUE_EX + "   a. Baixe o wheel apropriado para sua versão do Python e arquitetura do Windows\n"
+              + Fore.LIGHTBLUE_EX + "      (procure por 'PyAudio wheels for Windows Python X.Y').\n"
+              + Fore.LIGHTBLUE_EX + "   b. Instale com: 'pip install nome_do_arquivo.whl'\n"
+              + Fore.CYAN + "3" + Fore.WHITE + ". Verifique também se o 'Microsoft Visual C++ Build Tools' está instalado.\n"
+              + Fore.CYAN + "4" + Fore.WHITE + ". Para gravação do SOM DO SISTEMA (ESC+5), certifique-se que 'Stereo Mix' (ou 'Mixagem Estéreo') está HABILITADO nos seus dispositivos de gravação do Windows.\n" + "-" * 70)
     
-    print("Iniciando Peach Overlay (OverlayGPT)...")
+    print(Fore.GREEN + "Iniciando Peach Overlay (OverlayGPT)...")
     main()
