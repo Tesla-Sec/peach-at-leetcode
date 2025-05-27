@@ -8,6 +8,7 @@ import os
 import ctypes
 from openai import OpenAI
 from PyQt5 import QtWidgets, QtCore, QtGui
+from PyQt5.QtCore import QMetaObject, Qt
 import keyboard 
 import mss
 from flask import Flask, request, redirect 
@@ -387,6 +388,10 @@ class AppController(QtCore.QObject):
     def get_config_value(self, key, default=None):
         with self._config_lock: 
             return self.config.get(key, default)
+    
+    @QtCore.pyqtSlot()
+    def start_cursor_timer(self):
+        self.cursor_timer.start(500)
 
     @QtCore.pyqtSlot(dict)
     def handle_web_config_change(self, changed_values_from_web):
@@ -444,14 +449,16 @@ class AppController(QtCore.QObject):
     @QtCore.pyqtSlot(str, int)
     def _set_temporary_message_slot(self, html_message, duration_ms):
         if self.temporary_state_clear_timer.isActive():
-            self.temporary_state_clear_timer.stop()
+            if self.temporary_state_clear_timer.isActive():
+                QMetaObject.invokeMethod(self.temporary_state_clear_timer, "stop")
         self.signal_update_overlay_content.emit(html_message)
         self._temporary_message_active = True
         if duration_ms > 0: 
             self.temporary_state_clear_timer.start(duration_ms)
 
     def clear_temporary_message_and_restore_chat_view(self):
-        self.temporary_state_clear_timer.stop()
+        if self.temporary_state_clear_timer.isActive():
+            QMetaObject.invokeMethod(self.temporary_state_clear_timer, "stop")
         self._temporary_message_active = False
         if self.is_text_input_mode:
             self._update_text_input_overlay_display() 
@@ -1012,7 +1019,9 @@ class AppController(QtCore.QObject):
             self.user_input_active_for_overlay = True 
             self.current_input_text = ""
             self.cursor_visible = True
-            self.cursor_timer.start(500) 
+
+            # Inicia o timer com segurança na thread da GUI
+            QMetaObject.invokeMethod(self, "start_cursor_timer", Qt.QueuedConnection)
             
             if not self._text_input_hook_active: 
                 try:
@@ -1026,9 +1035,10 @@ class AppController(QtCore.QObject):
                     self.signal_set_temporary_message.emit("<p style='color:red;'>Erro ao ativar modo de texto.</p>", 3000)
                     return
             self._update_text_input_overlay_display()
+
         else: 
             self.user_input_active_for_overlay = False
-            self.cursor_timer.stop()
+            QMetaObject.invokeMethod(self.temporary_state_clear_timer, "stop", Qt.QueuedConnection)
             if self._text_input_hook_active and self._current_keyboard_hook is not None:
                 try:
                     keyboard.unhook(self._current_keyboard_hook)
@@ -1045,9 +1055,9 @@ class AppController(QtCore.QObject):
             self.user_input_active_for_overlay = not self.user_input_active_for_overlay
             self.cursor_visible = True 
             if not self.user_input_active_for_overlay:
-                self.cursor_timer.stop() 
+                QMetaObject.invokeMethod(self.temporary_state_clear_timer, "stop", Qt.QueuedConnection) 
             else:
-                self.cursor_timer.start(500) 
+                QMetaObject.invokeMethod(self, "start_cursor_timer", Qt.QueuedConnection) 
             self._update_text_input_overlay_display()
             feedback_msg = "Entrada de texto no overlay ATIVADA." if self.user_input_active_for_overlay else "Entrada de texto no overlay DESATIVADA (foco externo)."
             self.signal_set_temporary_message.emit(f"<p style='text-align:center;'>{feedback_msg}</p>", 2000)
@@ -1149,7 +1159,8 @@ class AppController(QtCore.QObject):
             if self.is_recording_mic_audio or self.is_recording_system_audio: 
                 self.signal_set_temporary_message.emit("<p style='text-align:center;'>Finalize a gravação (ESC+4 ou ESC+5) primeiro.</p>", 2500); return
             
-            self.temporary_state_clear_timer.stop() 
+            if self.temporary_state_clear_timer.isActive():
+                QMetaObject.invokeMethod(self.temporary_state_clear_timer, "stop") 
             selected_opt_str = self.menu_options_list[self.current_menu_selection_idx]
             feedback_msg_html = ""; config_changed = False; keep_menu_open = True 
             
@@ -1251,7 +1262,8 @@ class AppController(QtCore.QObject):
             self.menu_is_active = not self.menu_is_active
             AppController._chat_hotkeys_globally_enabled = not self.menu_is_active 
             if self.menu_is_active:
-                self.temporary_state_clear_timer.stop() 
+                if self.temporary_state_clear_timer.isActive():
+                    QMetaObject.invokeMethod(self.temporary_state_clear_timer, "stop") 
                 self.current_menu_selection_idx = 0
                 self.signal_update_menu_display.emit(self.menu_options_list, self.current_menu_selection_idx)
             else: 
@@ -1311,7 +1323,8 @@ class AppController(QtCore.QObject):
         if self.is_text_input_mode: return 
         try:
             if self.menu_is_active:
-                self.temporary_state_clear_timer.stop() 
+                if self.temporary_state_clear_timer.isActive():
+                    QMetaObject.invokeMethod(self.temporary_state_clear_timer, "stop", Qt.QueuedConnection)
                 if direction_str_up_down == "up": 
                     self.current_menu_selection_idx = (self.current_menu_selection_idx - 1 + len(self.menu_options_list)) % len(self.menu_options_list)
                 else: # "down"
