@@ -105,6 +105,22 @@ def start_web_server(app_controller_ref):
 
         margin_vals = config_ref_dict.get('margin', [0,0,0,0])
         if not isinstance(margin_vals, list) or len(margin_vals) != 4: margin_vals = [0,0,0,0]
+
+        modelos_disponiveis = [
+            "gpt-4o-2024-05-13",
+            "gpt-4o",
+            "gpt-4-turbo",
+            "gpt-4",
+            "gpt-3.5-turbo",
+            "gpt-3.5-turbo-16k"
+        ]
+
+        modelo_atual = config_ref_dict.get("model", "")
+        options_html = ""
+        for modelo in modelos_disponiveis:
+            selected = "selected" if modelo == modelo_atual else ""
+            options_html += f'<option value="{modelo}" {selected}>{modelo}</option>'
+
         
         html_content = f'''
         <!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -128,7 +144,10 @@ def start_web_server(app_controller_ref):
             {'<div class="message success">' + html.escape(message_from_post) + '</div>' if message_from_post and "Erro" not in message_from_post else ''}
             {'<div class="message error">' + html.escape(message_from_post) + '</div>' if message_from_post and "Erro" in message_from_post else ''}
             <form method="post">
-                <label for="gpt_model">Modelo GPT Visão/Multimodal:</label><input type="text" id="gpt_model" name="gpt_model" value="{html.escape(str(config_ref_dict.get('model','')))}"/>
+                <label for="gpt_model">Modelo GPT Visão/Multimodal:</label>
+                    <select id="gpt_model" name="gpt_model">
+                        {options_html}
+                    </select>
                 <label>Margem da Captura (X1, Y1, X2, Y2):</label><div class="margin-inputs-container">
                     <input type="number" name="x1" value="{margin_vals[0]}" placeholder="X1" title="X inicial"/>
                     <input type="number" name="y1" value="{margin_vals[1]}" placeholder="Y1" title="Y inicial"/>
@@ -180,6 +199,7 @@ class Overlay(QtWidgets.QWidget):
         
         QtCore.QTimer.singleShot(50, self.make_window_click_through)
 
+
     def make_window_click_through(self):
         try:
             hwnd = self.winId().__int__() 
@@ -201,6 +221,7 @@ class Overlay(QtWidgets.QWidget):
                 pass
         except Exception as e:
             print(Fore.RED + f"Erro crítico ao tornar a janela click-through: {e}\n{traceback.format_exc()}")
+
 
     def exclude_from_capture(self):
         try:
@@ -240,6 +261,7 @@ class Overlay(QtWidgets.QWidget):
         except Exception as e:
             print(Fore.RED + f"Erro crítico ao configurar estilos de janela/afinidade: {e}\n{traceback.format_exc()}")
 
+
     def apply_geometry_from_config(self, config_dict):
         self.current_config = dict(config_dict) 
         self.setWindowOpacity(self.current_config.get('opacity', 0.8))
@@ -266,11 +288,13 @@ class Overlay(QtWidgets.QWidget):
         if hasattr(self, 'text_label'):
              self.text_label.setGeometry(0, 0, int(overlay_width), int(overlay_height))
 
+
     @QtCore.pyqtSlot(str)
     def update_text_display(self, content_html_str):
         try:
             if self.text_label: self.text_label.setText(content_html_str)
         except Exception as e: print(f"Erro update_text_display: {e}")
+
 
     @QtCore.pyqtSlot(list, int)
     def show_menu_display_slot(self, options_list_str, selected_idx_int):
@@ -368,7 +392,7 @@ class AppController(QtCore.QObject):
                 PYAUDIO_AVAILABLE = False 
                 print(Fore.YELLOW + "Aviso: PYAUDIO_AVAILABLE foi definido como False devido a um erro de inicialização.")
                 if hasattr(self, 'signal_set_temporary_message'):
-                     QtCore.QTimer.singleShot(100, lambda: self.signal_set_temporary_message.emit(f"<p style='color:red;text-align:center;'>Erro PyAudio: {e}. Gravação desabilitada.</p>", 5000))
+                    QtCore.QTimer.singleShot(100, lambda: self.signal_set_temporary_message.emit(f"<p style='color:red;text-align:center;'>Erro PyAudio: {e}. Gravação desabilitada.</p>", 5000))
 
         self.is_text_input_mode = False
         self.current_input_text = ""
@@ -385,13 +409,16 @@ class AppController(QtCore.QObject):
         with self._config_lock: 
             return dict(self.config)
 
+
     def get_config_value(self, key, default=None):
         with self._config_lock: 
             return self.config.get(key, default)
     
+
     @QtCore.pyqtSlot()
     def start_cursor_timer(self):
         self.cursor_timer.start(500)
+
 
     @QtCore.pyqtSlot(dict)
     def handle_web_config_change(self, changed_values_from_web):
@@ -404,6 +431,7 @@ class AppController(QtCore.QObject):
         if config_actually_updated:
             self.save_config() 
             self.signal_apply_config_to_overlay.emit(dict(self.config)) 
+
 
     def load_config_from_json(self):
         global CONFIG_FILE 
@@ -433,6 +461,7 @@ class AppController(QtCore.QObject):
                 print(Fore.RED + f"ERRO ao carregar/criar '{CONFIG_FILE}': {e}. Usando defaults.\n{traceback.format_exc()}")
                 return default_cfg
     
+
     def save_config(self, config_to_save=None):
         global CONFIG_FILE
         try:
@@ -442,9 +471,11 @@ class AppController(QtCore.QObject):
         except Exception as e: 
             print(Fore.RED + f"ERRO ao salvar configurações: {e}\n{traceback.format_exc()}")
     
+
     @QtCore.pyqtSlot(bool)
     def _set_processing_flag_slot(self, state: bool):
         self.is_currently_processing_chatgpt = state
+
 
     @QtCore.pyqtSlot(str, int)
     def _set_temporary_message_slot(self, html_message, duration_ms):
@@ -455,6 +486,7 @@ class AppController(QtCore.QObject):
         self._temporary_message_active = True
         if duration_ms > 0: 
             self.temporary_state_clear_timer.start(duration_ms)
+
 
     def clear_temporary_message_and_restore_chat_view(self):
         if self.temporary_state_clear_timer.isActive():
@@ -484,6 +516,7 @@ class AppController(QtCore.QObject):
                            f"<p style='margin:2px 0; color:#E0E0E0;'>W: {width}, H: {height}</p>"
                            f"</div>")
             self.signal_set_temporary_message.emit(margin_text, 5000) 
+
 
     def take_screenshot_bytes_for_api(self):
         try:
@@ -521,6 +554,7 @@ class AppController(QtCore.QObject):
             print(Fore.RED + f"ERRO MSS Captura de Tela: {e}\n{traceback.format_exc()}")
             self.signal_set_temporary_message.emit(f"<p style='color:red;text-align:center;'>Erro ao capturar tela: {html.escape(str(e))[:50]}</p>", 4000)
             return None
+
 
     def _threaded_call_to_openai_vision_api(self, image_bytes_data, is_new_chat_bool):
         if not self.openai_client: self.signal_update_overlay_content.emit("<p style='color:red;text-align:center;'>ERRO: Cliente OpenAI não iniciado.</p>"); return
@@ -586,6 +620,7 @@ class AppController(QtCore.QObject):
         
         return f"<div style='padding:2px;'>{separator}{prefix_html}{formatted_text}</div>"
 
+
     def _initiate_chatgpt_request(self, is_new_chat_bool): 
         if not self.openai_client: 
             self.signal_set_temporary_message.emit("<p style='color:red;text-align:center;'>ERRO: OpenAI não configurado.</p>",3000)
@@ -604,6 +639,7 @@ class AppController(QtCore.QObject):
         image_bytes = self.take_screenshot_bytes_for_api()
         if image_bytes:
             threading.Thread(target=self._threaded_call_to_openai_vision_api, args=(image_bytes, is_new_chat_bool), daemon=True).start()
+
 
     def on_hotkey_esc_4_mic_audio_toggle(self):
         if self.is_text_input_mode:
@@ -632,6 +668,7 @@ class AppController(QtCore.QObject):
             self.is_recording_mic_audio = False 
             print(Fore.RED + f"ERRO ESC+4: {e}\n{traceback.format_exc()}")
             self.signal_set_temporary_message.emit(f"<p style='color:red;text-align:center;'>Erro na gravação de microfone: {html.escape(str(e))[:50]}</p>", 3000)
+
 
     def _threaded_record_mic_audio(self):
         audio_stream = None 
@@ -669,6 +706,7 @@ class AppController(QtCore.QObject):
                               daemon=True).start()
              self.mic_audio_frames_buffer = [] 
 
+
     def _save_mic_audio_and_process_with_vision(self, frames_copy, image_bytes_param):
         if not frames_copy and not image_bytes_param: return 
         
@@ -689,6 +727,7 @@ class AppController(QtCore.QObject):
                 self.signal_set_temporary_message.emit(f"<p style='color:red;text-align:center;'>Erro ao salvar áudio WAV (mic): {html.escape(str(e))[:50]}</p>", 3000)
         
         self._threaded_transcribe_audio_and_call_multimodal_vision(audio_file_path_to_process, image_bytes_param, "mic")
+
 
     def _find_loopback_device_index(self):
         if not PYAUDIO_AVAILABLE or not self.pyaudio_instance:
@@ -722,6 +761,7 @@ class AppController(QtCore.QObject):
             print(Fore.RED + f"Erro ao procurar dispositivo de loopback: {e}")
             self.signal_set_temporary_message.emit(f"<p style='color:red;text-align:center;'>Erro ao procurar loopback: {html.escape(str(e))[:30]}</p>", 4000)
             return None
+
 
     def on_hotkey_esc_5_system_audio_toggle(self):
         if self.is_text_input_mode:
@@ -817,6 +857,7 @@ class AppController(QtCore.QObject):
                              args=(list(self.system_audio_frames_buffer), captured_screenshot_bytes, actual_channels, actual_rate),
                              daemon=True).start()
             self.system_audio_frames_buffer = []
+
 
     def _save_system_audio_and_process_with_vision(self, frames_copy, image_bytes_param, channels, rate):
         if not frames_copy and not image_bytes_param: return
@@ -954,6 +995,7 @@ class AppController(QtCore.QObject):
             self.cursor_visible = not self.cursor_visible
             self._update_text_input_overlay_display() 
 
+
     def _update_text_input_overlay_display(self):
         if not self.is_text_input_mode:
             return
@@ -1006,6 +1048,7 @@ class AppController(QtCore.QObject):
 
         final_html = history_html + input_prompt_html + status_html
         self.signal_update_overlay_content.emit(final_html)
+
 
     def on_hotkey_esc_6_toggle_text_input_mode(self):
         if self.is_recording_mic_audio or self.is_recording_system_audio or self.menu_is_active or self.is_currently_processing_chatgpt:
@@ -1135,12 +1178,27 @@ class AppController(QtCore.QObject):
             self.history.append({"role": "assistant", "content": assistant_reply})
 
             if len(self.history) > (max_hist_pairs * 2 + 1):
-                 self.history = [self.history[0]] + self.history[-(max_hist_pairs * 2):]
+                self.history = [self.history[0]] + self.history[-(max_hist_pairs * 2):]
 
         except Exception as e:
-            error_message = f"Erro na API OpenAI (Chat): {html.escape(str(e))[:100]}"
-            self.history.append({"role": "assistant", "content": f"Erro: {error_message}"}) 
+            error_str = str(e)
+            if "quota" in error_str.lower():
+                user_message = (
+                    "❌ Você atingiu o limite da sua conta OpenAI.\n"
+                    "Verifique seus créditos ou plano em:\n"
+                    "https://platform.openai.com/account/usage"
+                )
+                self.signal_set_temporary_message.emit("Você ultrapassou seus créditos!", 2000)
+            else:
+                user_message = f"Erro na API: {error_str[:100]}"
+                self.signal_set_temporary_message.emit("Erro ao chamar a API OpenAI", 2000)
+
+            self.history.append({"role": "assistant", "content": user_message})
+            formatted_html = self._format_gpt_response_for_html_display(user_message, prefix="💬 IA:")
+            self.signal_update_overlay_content.emit(formatted_html)
+
             print(Fore.RED + f"ERRO API OpenAI (Chat Texto): {e}\n{traceback.format_exc()}")
+
         finally:
             self.signal_toggle_processing_flag.emit(False)
             self._update_text_input_overlay_display() 
@@ -1151,6 +1209,7 @@ class AppController(QtCore.QObject):
                "<p style='text-align:center; font-size:small;'>(Voltando ao menu em 7s...)</p>")
         self.signal_set_temporary_message.emit(msg, 7000)
         
+
     def on_menu_option_selected_enter(self):
         if self.is_text_input_mode: 
             self.signal_set_temporary_message.emit("<p style='text-align:center;'>Saia do modo de texto (ESC+6) primeiro.</p>", 2500); return
@@ -1210,10 +1269,11 @@ class AppController(QtCore.QObject):
             print(Fore.RED + f"ERRO Menu Enter: {e}\n{traceback.format_exc()}")
             self.signal_set_temporary_message.emit("<p style='color:red;text-align:center'>Erro ao processar opção do menu.</p>", 3000)
             
+
     def display_last_chat_message_or_default(self):
         if self._temporary_message_active or self.is_recording_mic_audio or self.is_recording_system_audio or self.is_text_input_mode: return 
         if self.is_currently_processing_chatgpt: 
-             self.signal_update_overlay_content.emit("<p style='text-align:center;'>Processando com IA...</p>"); return
+            self.signal_update_overlay_content.emit("<p style='text-align:center;'>Processando com IA...</p>"); return
         
         last_assistant_msg_str = ""; prefix = "💬 IA:" 
         if self.history: 
@@ -1249,10 +1309,13 @@ class AppController(QtCore.QObject):
     def on_hotkey_esc_1(self): 
         try: self._initiate_chatgpt_request(True)
         except Exception as e: print(Fore.RED + f"ERRO ESC+1: {e}\n{traceback.format_exc()}")
+    
+
     def on_hotkey_esc_2(self): 
         try: self._initiate_chatgpt_request(False)
         except Exception as e: print(Fore.RED + f"ERRO ESC+2: {e}\n{traceback.format_exc()}")
     
+
     def on_hotkey_esc_3_menu_toggle(self):
         if self.is_text_input_mode:
             self.signal_set_temporary_message.emit("<p style='text-align:center;'>Saia do modo de texto (ESC+6) primeiro.</p>", 2500); return
@@ -1269,6 +1332,7 @@ class AppController(QtCore.QObject):
             else: 
                 self.display_last_chat_message_or_default()
         except Exception as e: print(Fore.RED + f"ERRO ESC+3: {e}\n{traceback.format_exc()}")
+
 
     def on_hotkey_esc_0_exit_menu_or_clear(self):
         try:
@@ -1291,6 +1355,7 @@ class AppController(QtCore.QObject):
             elif self.is_recording_system_audio:
                 self.signal_set_temporary_message.emit("<p style='text-align:center;'>Use ESC+5 para parar a gravação do som do sistema.</p>", 2500)
         except Exception as e: print(Fore.RED + f"ERRO ESC+0: {e}\n{traceback.format_exc()}")
+
 
     def on_hotkey_web_config(self): 
         if self.is_text_input_mode:
@@ -1319,6 +1384,7 @@ class AppController(QtCore.QObject):
             print(Fore.RED + f"ERRO CTRL+9 (Web Config): {e}\n{traceback.format_exc()}")
             self.signal_set_temporary_message.emit(f"<p style='color:red;text-align:center;'>Erro ao abrir config web: {html.escape(str(e))[:50]}</p>", 4000)
             
+
     def on_menu_navigation_input(self, direction_str_up_down):
         if self.is_text_input_mode: return 
         try:
@@ -1333,6 +1399,7 @@ class AppController(QtCore.QObject):
         except Exception as e: 
             print(Fore.RED + f"ERRO Navegação Menu ({direction_str_up_down}):{e}\n{traceback.format_exc()}")
     
+
     def cleanup_on_exit(self):
         print(Fore.GREEN + "Limpando recursos antes de sair...")
         self.save_config()
@@ -1346,7 +1413,7 @@ class AppController(QtCore.QObject):
             except Exception as e: 
                 print(Fore.RED + f"Erro ao remover gancho de texto na saída: {e}")
         elif self._text_input_hook_active: 
-             print(Fore.YELLOW + "Aviso: Gancho de texto estava ativo mas sem handle para remover especificamente.")
+            print(Fore.YELLOW + "Aviso: Gancho de texto estava ativo mas sem handle para remover especificamente.")
 
 
         if self.pyaudio_instance:
@@ -1363,6 +1430,7 @@ class AppController(QtCore.QObject):
                     print(Fore.YELLOW + f"Arquivo temporário {temp_file} removido.")
                 except Exception as e_del:
                     print(Fore.RED + f"Erro ao deletar {temp_file}: {e_del}")
+
 
 # --- Main Application Setup & Execution ---
 def main():
