@@ -128,21 +128,12 @@ Once the script is running, an overlay will appear on your screen. You can inter
 
 ## 🛣️ Roadmap
 
-### Coming Soon
+### Recent Additions
 
 * Separate uploads for screenshots and audio transcripts
 * Prompt editing interface
 * Model list management
-* Support for additional backends:
-
-  * Astral
-  * Claude
-  * DeepSeek
-  * Gemini
-  * Grok
-  * Llama
-  * Perplexity
-  * Qwen
+* Support for additional backends (OpenAI, Claude, Gemini, Llama and more)
 
 ### Coming Later
 
@@ -163,7 +154,7 @@ Contributions are very welcome!
 ---
 ## No Donate for Now :)
 
- yep, i make this and the code with AI.
+Yep, I created this project and its code with the help of AI.
 
 ---
 ## 📄 License

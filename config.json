@@ -1,6 +1,6 @@
 {
     "opacity": 1.0,
-    "position": "bottom-left",
+    "position": "bottom-right",
     "model": "gpt-4o-2024-05-13",
     "port": 43000,
     "margin": [
@@ -17,5 +17,12 @@
     "api_max_tokens": 300,
     "overlay_height_ratio": 0.9,
     "whisper_model": "gpt-4o-transcribe",
-    "chat_model": "gpt-4o-2024-05-13"
+    "chat_model": "gpt-4o-2024-05-13",
+    "backend": "openai",
+    "available_models": [
+        "gpt-4o-2024-05-13"
+    ],
+    "system_prompt_multimodal": "Voc\u00c3\u00aa \u00c3\u00a9 um assistente multimodal. Combine informa\u00c3\u00a7\u00c3\u00b5es de imagens e \u00c3\u00a1udio para responder.",
+    "system_prompt_chat": "Voc\u00c3\u00aa \u00c3\u00a9 um assistente de chat prestativo e conciso.",
+    "separate_uploads": false
 }
